@@ -1,0 +1,10 @@
+Mini-project: a guide, and a discussion board
+Mini-project building is in full swing, so I've been rereading the brief this week to check it says what I actually mean. It says "one agent, not just a single prompt to a chatbot," and that leaves more room than I intended.
+So I've written a detailed guide called "What Counts as an Agent" that closes the gap. The short version... your own code has to call an LLM through an API. If nothing in your repository imports an AI library and sends a request, there's no agent in your repository. The guide covers why, what to do instead, and the harder question of when a problem actually needs an agent rather than a script.
+
+I've also opened a discussion board for the mini-project. The guide is attached there as well along with the brief, and that's where I'd like the questions to go because the answers are useful to everyone.
+
+One ask. If you see a question on that board you can answer... answer it. Working out whether somebody else's idea needs an agent is genuinely good practice for working out whether yours does.
+Also read the posts from older discussion board, it's a goldmine there. One thing that came from a post there, many of you are developing what to me is one of the most important skills you could learn from this class...identifying if your project has an agentic AI component to it...or if it even needs one. Read those posts, read the new discussion board and the brief I've prepared for you. 
+Remember, if you don't have a python script, you don't have an agent that qualifies for this mini project. Read the guide. You don't have to write every line of code. I fact, you don't need to write any code at all. You have to UNDERSTAND the problem well enough to direct the build and recognize if the results are good enough. You have everything you need for your AI assistant to know exactly what the project requires, but you still need to give them all the information they need to help you write an agent for THIS project.
+READ what I wrote in the discussion board, post something, answer other posts, and read the guide. And have fun building your agent!
