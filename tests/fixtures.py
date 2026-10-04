@@ -21,8 +21,9 @@ def make_record(
         move = board.parse_san(san)
         canonical.append(board.san(move))
         board.push(move)
+    pgn = " ".join(f"{i // 2 + 1}. {m}" if i % 2 == 0 else m for i, m in enumerate(canonical))
     return GameRecord(
-        pgn="",
+        pgn=pgn,
         end_time=0,
         time_class="rapid",
         player_color=color,

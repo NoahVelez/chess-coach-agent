@@ -87,6 +87,8 @@ def _check_min_games(min_games: int) -> int:
 
 def list_games(games: Sequence[GameRecord], color: str | None = None, offset: int = 0, limit: int = MAX_ROWS) -> dict:
     """One row per game: metadata and opening headers. Newest game is index 0."""
+    if color is not None:
+        require_color(color)
     selected = select_games(games, color)
     limit = max(1, min(int(limit), MAX_ROWS))
     offset = max(0, int(offset))
