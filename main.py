@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import os
 import re
 import shutil
@@ -26,12 +27,20 @@ from tools.stockfish_tool import MISTAKE_THRESHOLD_CP, StockfishSession
 
 DEFAULT_GAMES = 40  # openings need sample size
 REPORTS_DIR = Path(__file__).parent / "reports"
+LOGS_DIR = Path(__file__).parent / "logs"  # full model conversations; not reports, and gitignored
 
 STATUS_NOTES = {
     "final": None,
     "cap_reached": "**Cap reached:** the agent used all of its turns and was forced to write this report from what it had learned so far.",
     "unparseable": "**Incomplete run:** the model never produced a parseable answer; the body below is the recorded reasoning trail.",
     "model_error": "**Incomplete run:** a model call failed; the body below is the recorded reasoning trail.",
+}
+
+
+AUDIT_LABELS = {
+    "not_run": "not run",
+    "confirmed": "draft re-checked and kept unchanged",
+    "revised": "draft re-checked and revised",
 }
 
 
@@ -60,6 +69,7 @@ def build_header(username: str, store: FactsStore, run: AgentRun, now: dt.dateti
         f"- Games analyzed: {profile['games_loaded']} loaded, {profile['games_with_engine_analysis']} with engine analysis",
         f"- Model: {run.model}",
         f"- Agent turns used: {run.turns_used}",
+        f"- Self-audit: {AUDIT_LABELS.get(run.audit, run.audit)}",
     ]
     note = STATUS_NOTES.get(run.status)
     if note:
@@ -84,6 +94,18 @@ def write_report(username: str, store: FactsStore, run: AgentRun, reports_dir: P
         except FileExistsError:
             continue
     raise RuntimeError(f"Could not find a free report filename for {stem}")
+
+
+def write_transcript(username: str, run: AgentRun, logs_dir: Path = LOGS_DIR, now: dt.datetime | None = None) -> Path:
+    """One JSON message per line: the whole conversation, so every claim can be traced to a tool result."""
+    now = now or dt.datetime.now()
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = re.sub(r"[^A-Za-z0-9_-]", "_", username)
+    path = logs_dir / f"{safe_name}_{now.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    with open(path, "w", encoding="utf-8") as handle:
+        for message in run.conversation:
+            handle.write(json.dumps(message, ensure_ascii=False) + "\n")
+    return path
 
 
 def main() -> None:
@@ -111,6 +133,7 @@ def main() -> None:
     try:
         run = run_coaching_agent(store, args.username, max_iterations=args.max_turns)
         path = write_report(args.username, store, run)
+        print(f"Transcript: {write_transcript(args.username, run)}", file=sys.stderr)
     finally:
         store.close()
 

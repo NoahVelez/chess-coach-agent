@@ -5,7 +5,7 @@ from pathlib import Path
 
 from agent.facts_store import FactsStore, GameFacts
 from agent.loop import AgentRun
-from main import build_header, write_report
+from main import build_header, write_report, write_transcript
 from tests.fixtures import SAMPLE_GAMES
 
 NOW = dt.datetime(2026, 10, 4, 15, 30, 5)
@@ -29,6 +29,7 @@ class ReportTests(unittest.TestCase):
         self.assertIn("- Games analyzed: 6 loaded, 0 with engine analysis", text)
         self.assertIn("- Model: m-test", text)
         self.assertIn("- Agent turns used: 7", text)
+        self.assertIn("- Self-audit: not run", text)
         self.assertIn("## My own heading\nDo X.", text)
         self.assertNotIn("Cap reached", text)
 
@@ -48,6 +49,22 @@ class ReportTests(unittest.TestCase):
             self.assertNotEqual(a, b)
             self.assertIn("first", a.read_text(encoding="utf-8"))
             self.assertIn("second", b.read_text(encoding="utf-8"))
+
+    def test_audit_outcome_shown_in_header(self):
+        run = make_run()
+        run.audit = "revised"
+        self.assertIn("Self-audit: draft re-checked and revised", build_header("u", make_store(), run, NOW))
+
+
+class TranscriptTests(unittest.TestCase):
+    def test_writes_one_json_message_per_line_outside_reports(self):
+        run = make_run()
+        run.conversation = [{"role": "system", "content": "s"}, {"role": "assistant", "content": "caf\u00e9"}]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write_transcript("Some.User", run, Path(tmp) / "logs", NOW)
+            lines = path.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(path.name, "Some_User_20261004-153005.jsonl")
+        self.assertEqual([__import__("json").loads(l)["role"] for l in lines], ["system", "assistant"])
 
 
 if __name__ == "__main__":
