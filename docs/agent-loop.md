@@ -72,6 +72,10 @@ flowchart TD
     J --> A
 ```
 
+## No final before facts
+
+The first user message says the game data is only available through the tools. A `final` sent before any tool has been called is rejected with a corrective message (it uses the format-retry counter, not a turn): the model has seen no facts, so a report would be invented or an empty refusal. This is what stopped a run where `gpt-5.4-mini` answered "no tool results provided" instead of calling a tool.
+
 ## Run status line and self-audit
 
 After every tool result the loop appends one plain-facts line, for example `RUN STATUS: turns used 4 of 20; engine tool calls so far 1; games with engine analysis 1.` It carries no advice.

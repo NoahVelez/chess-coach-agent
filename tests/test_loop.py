@@ -126,7 +126,7 @@ class LoopTests(unittest.TestCase):
             response=httpx.Response(400, request=request),
             body=None,
         )
-        result, client, _ = run([err, final_reply()])
+        result, client, _ = run([err, tool_reply("get_player_profile"), final_reply()])
         self.assertEqual(result.status, "final")
         self.assertIn("temperature", client.requests[0])
         self.assertNotIn("temperature", client.requests[1])
@@ -168,33 +168,33 @@ class BudgetLineTests(unittest.TestCase):
 
 class AuditTests(unittest.TestCase):
     def test_audit_message_follows_first_final_and_revision_is_used(self):
-        result, client, log = run([final_reply("# Draft"), final_reply("# Revised")], audit_rounds=1)
+        result, client, log = run([tool_reply("get_player_profile"), final_reply("# Draft"), final_reply("# Revised")], audit_rounds=1)
         self.assertEqual((result.report, result.audit, result.status), ("# Revised", "revised", "final"))
-        self.assertEqual(result.turns_used, 2)
-        self.assertEqual(client.requests[1]["messages"][-1]["content"], loop.AUDIT_MESSAGE)
+        self.assertEqual(result.turns_used, 3)
+        self.assertEqual(client.requests[2]["messages"][-1]["content"], loop.AUDIT_MESSAGE)
         self.assertIn("asking the model to audit", log)
 
     def test_unchanged_draft_is_confirmed(self):
-        result, _, _ = run([final_reply("# Same"), final_reply("# Same")], audit_rounds=1)
+        result, _, _ = run([tool_reply("get_player_profile"), final_reply("# Same"), final_reply("# Same")], audit_rounds=1)
         self.assertEqual((result.report, result.audit), ("# Same", "confirmed"))
 
     def test_audit_may_call_a_tool_before_the_final(self):
         result, client, _ = run(
-            [final_reply("# Draft"), tool_reply("get_player_profile"), final_reply("# Checked")], audit_rounds=1
+            [tool_reply("get_player_profile"), final_reply("# Draft"), tool_reply("get_player_profile"), final_reply("# Checked")], audit_rounds=1
         )
-        self.assertEqual((result.report, result.audit, result.turns_used), ("# Checked", "revised", 3))
+        self.assertEqual((result.report, result.audit, result.turns_used), ("# Checked", "revised", 4))
 
     def test_only_one_audit_round(self):
-        result, client, _ = run([final_reply("# A"), final_reply("# B")], audit_rounds=1)
-        self.assertEqual(len(client.requests), 2)
+        result, client, _ = run([tool_reply("get_player_profile"), final_reply("# A"), final_reply("# B")], audit_rounds=1)
+        self.assertEqual(len(client.requests), 3)
 
     def test_unparseable_audit_keeps_first_draft(self):
-        result, _, _ = run([final_reply("# Draft")] + ["garbage"] * 6, audit_rounds=1)
+        result, _, _ = run([tool_reply("get_player_profile"), final_reply("# Draft")] + ["garbage"] * 6, audit_rounds=1)
         self.assertEqual((result.report, result.status, result.audit), ("# Draft", "final", "confirmed"))
 
     def test_model_error_during_audit_keeps_first_draft(self):
         err = openai.APIConnectionError(request=httpx.Request("POST", "http://test"))
-        result, _, _ = run([final_reply("# Draft"), err], audit_rounds=1)
+        result, _, _ = run([tool_reply("get_player_profile"), final_reply("# Draft"), err], audit_rounds=1)
         self.assertEqual((result.report, result.status), ("# Draft", "final"))
 
     def test_final_on_the_last_turn_is_not_audited(self):
@@ -208,9 +208,29 @@ class AuditTests(unittest.TestCase):
             self.assertNotIn(phrase, text)
 
     def test_conversation_is_returned_for_transcripts(self):
-        result, _, _ = run([final_reply()])
+        result, _, _ = run([tool_reply("get_player_profile"), final_reply()])
         self.assertEqual(result.conversation[0]["role"], "system")
         self.assertEqual(result.conversation[-1]["role"], "assistant")
+
+
+class NoFactsYetTests(unittest.TestCase):
+    def test_final_before_any_tool_call_is_rejected_without_using_a_turn(self):
+        result, client, _ = run([final_reply("# Cannot report"), tool_reply("get_player_profile"), final_reply("# Real")])
+        self.assertEqual((result.report, result.turns_used), ("# Real", 2))
+        self.assertIn("not called any tool yet", client.requests[1]["messages"][-1]["content"])
+
+    def test_refusing_to_use_tools_ends_in_a_trail_report(self):
+        result, _, _ = run([final_reply("# Cannot report")] * 6)
+        self.assertEqual(result.status, "unparseable")
+        self.assertEqual(result.turns_used, 0)
+
+    def test_audit_does_not_run_on_a_refusal(self):
+        result, client, _ = run([final_reply("# Cannot"), tool_reply("get_player_profile"), final_reply("# Real"), final_reply("# Real")], audit_rounds=1)
+        self.assertEqual(result.audit, "confirmed")
+
+    def test_opening_message_says_data_is_only_in_tools(self):
+        _, client, _ = run([tool_reply("get_player_profile"), final_reply()])
+        self.assertIn("only through the tools", client.requests[0]["messages"][1]["content"])
 
 
 class PromptTests(unittest.TestCase):

@@ -151,6 +151,7 @@ def run_coaching_agent(
     trail: list[TurnRecord] = []
     turns_used = 0
     engine_calls = 0
+    tool_calls = 0
     draft: str | None = None  # the report as first submitted, while the audit is pending
 
     def finish(report: str, status: str) -> AgentRun:
@@ -164,7 +165,7 @@ def run_coaching_agent(
 
     try:
         while turns_used < max_iterations:
-            parsed = _next_valid_reply(session, conversation)
+            parsed = _next_valid_reply(session, conversation, facts_seen=tool_calls > 0)
             if parsed is None:
                 if draft is not None:
                     print("[agent] audit reply never parsed; keeping the first draft", file=log)
@@ -182,6 +183,7 @@ def run_coaching_agent(
                     continue
                 return finish(parsed["report"], "final")
 
+            tool_calls += 1
             if parsed["name"] in ENGINE_TOOLS:
                 engine_calls += 1
             tool_message = _run_tool(store, parsed)
@@ -219,6 +221,7 @@ def _opening_message(store: FactsStore, username: str) -> str:
     return (
         f"Player: {username}. Data loaded: {len(records)} recent rapid/blitz games "
         f"({as_white} as White, {len(records) - as_white} as Black). "
+        "None of the game data is included in this message; it is available only through the tools. "
         "Produce the coaching report."
     )
 
@@ -232,14 +235,16 @@ def _run_tool(store: FactsStore, parsed: dict) -> str:
     return f"TOOL RESULT ({name}): {json.dumps(result, separators=(',', ':'))}"
 
 
-def _next_valid_reply(session: "_ModelSession", conversation: list[dict], final_only: bool = False) -> dict | None:
+def _next_valid_reply(
+    session: "_ModelSession", conversation: list[dict], final_only: bool = False, facts_seen: bool = True
+) -> dict | None:
     """Ask the model until it sends a well-shaped reply; malformed replies get one corrective
     message each and do not count as investigation turns."""
     failures = 0
     while failures <= MAX_FORMAT_RETRIES:
         reply = session.call(conversation)
         conversation.append({"role": "assistant", "content": reply})
-        parsed, problem = _parse_reply(reply, final_only)
+        parsed, problem = _parse_reply(reply, final_only, facts_seen)
         if parsed is not None:
             return parsed
         failures += 1
@@ -249,7 +254,7 @@ def _next_valid_reply(session: "_ModelSession", conversation: list[dict], final_
     return None
 
 
-def _parse_reply(reply: str, final_only: bool = False) -> tuple[dict | None, str]:
+def _parse_reply(reply: str, final_only: bool = False, facts_seen: bool = True) -> tuple[dict | None, str]:
     text = reply.strip()
     if text.startswith("```"):
         text = text.strip("`")
@@ -264,6 +269,11 @@ def _parse_reply(reply: str, final_only: bool = False) -> tuple[dict | None, str
 
     kind = data.get("type")
     if kind == "final":
+        if not facts_seen:
+            return None, (
+                "you have not called any tool yet, so you have seen no facts about this player's games "
+                "(none are in this conversation until a tool returns them). Call a tool now."
+            )
         if not _is_text(data.get("report")):
             return None, 'a "final" reply needs a non-empty string "report".'
         if not _is_text(data.get("decision_so_far")):
