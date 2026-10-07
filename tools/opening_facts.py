@@ -43,6 +43,22 @@ def normalize_line(line: str | Sequence[str] | None) -> list[str]:
     return cleaned
 
 
+def annotate_line(color: str, moves: Sequence[str]) -> str:
+    """Numbered line with each move tagged by who played it: "1.e4(player) c6(opponent) 2.d4(player)"."""
+    parts = []
+    for p, move in enumerate(moves):
+        tag = mover_of_ply(color, p)
+        prefix = f"{p // 2 + 1}." if p % 2 == 0 else ""
+        parts.append(f"{prefix}{move}({tag})")
+    return " ".join(parts)
+
+
+def split_by_mover(color: str, moves: Sequence[str]) -> tuple[list[str], list[str]]:
+    player = [m for p, m in enumerate(moves) if mover_of_ply(color, p) == "player"]
+    opponent = [m for p, m in enumerate(moves) if mover_of_ply(color, p) == "opponent"]
+    return player, opponent
+
+
 def require_color(color: str | None) -> str:
     if color not in COLORS:
         raise ValueError(f"color must be one of {list(COLORS)}, got {color!r}")
@@ -108,6 +124,7 @@ def list_games(games: Sequence[GameRecord], color: str | None = None, offset: in
             "opening_name": g.opening_name,
             "total_plies": len(moves),
             "first_moves": moves[:6],
+            "first_moves_annotated": annotate_line(g.player_color, moves[:6]),
         }
         for i, g, moves in page
     ]
@@ -184,9 +201,16 @@ def opening_sequences(
     rows = []
     for sequence, members in ordered[:MAX_ROWS]:
         records = [g for _, g in members]
+        row = {"player_color": color, "sequence": list(sequence)}
+        if perspective == "full_line":
+            row["line_annotated"] = annotate_line(color, sequence)
+            row["player_moves"], row["opponent_moves"] = split_by_mover(color, sequence)
+        else:
+            row["player_moves"] = list(sequence)
+            row["opponent_moves"] = "not part of this grouping (any reply)"
         rows.append(
             {
-                "sequence": list(sequence),
+                **row,
                 **tally(records),
                 "game_indexes": [i for i, _ in members][:MAX_EXAMPLE_GAMES],
                 "eco_codes": sorted({g.eco for g in records if g.eco}),
@@ -196,6 +220,7 @@ def opening_sequences(
     below = {k: v for k, v in groups.items() if len(v) < min_games}
     return {
         "color": color,
+        "player_color": color,
         "depth_plies": depth_plies,
         "perspective": perspective,
         "min_games": min_games,
@@ -225,9 +250,12 @@ def move_distribution(games: Sequence[GameRecord], color: str, prefix, min_games
 
     kept = {k: v for k, v in groups.items() if len(v) >= min_games}
     ordered = sorted(kept.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+    next_mover = mover_of_ply(color, depth)
     rows = [
         {
             "next_move": move,
+            "played_by": next_mover,
+            "line_annotated": annotate_line(color, line + [move]),
             **tally([g for _, g in members]),
             "game_indexes": [i for i, _ in members][:MAX_EXAMPLE_GAMES],
         }
@@ -236,7 +264,9 @@ def move_distribution(games: Sequence[GameRecord], color: str, prefix, min_games
     below = {k: v for k, v in groups.items() if len(v) < min_games}
     return {
         "color": color,
+        "player_color": color,
         "prefix": line,
+        "prefix_annotated": annotate_line(color, line),
         "next_ply": depth + 1,
         "next_mover": mover_of_ply(color, depth),
         "games_matching_prefix": len(matching),
@@ -280,9 +310,11 @@ def departure_points(games: Sequence[GameRecord], color: str, line, min_games: i
     ordered = sorted(kept.items(), key=lambda kv: (-len(kv[1]), kv[0]))
     rows = [
         {
+            "player_color": color,
             "ply": ply,
             "move_number": (ply - 1) // 2 + 1,
             "departed_by": side,
+            "line_annotated": annotate_line(color, reference[: ply - 1] + [played]),
             "move_played": played,
             "reference_move": expected,
             **tally([g for _, g in members]),
@@ -293,7 +325,9 @@ def departure_points(games: Sequence[GameRecord], color: str, line, min_games: i
     below = {k: v for k, v in departures.items() if len(v) < min_games}
     return {
         "color": color,
+        "player_color": color,
         "line": reference,
+        "line_annotated": annotate_line(color, reference),
         "games_of_color": len(selected),
         "followed_whole_line": tally(followed),
         "ended_inside_line": ended_inside,

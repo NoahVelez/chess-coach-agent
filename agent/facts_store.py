@@ -44,6 +44,10 @@ class FactsStore:
     def records(self) -> list[GameRecord]:
         return [g.record for g in self._games]
 
+    @property
+    def engine_analyzed_games(self) -> int:
+        return sum(1 for g in self._games if g.analyzed)
+
     def close(self) -> None:
         if self._engine is not None:
             self._engine.close()
@@ -70,7 +74,7 @@ class FactsStore:
             "latest_rating": records[0].player_rating,
             "earliest_rating": records[-1].player_rating,
             "index_order": "game_index 0 is the newest game",
-            "games_with_engine_analysis": sum(1 for g in self._games if g.analyzed),
+            "games_with_engine_analysis": self.engine_analyzed_games,
             "engine_depth": ANALYSIS_DEPTH,
             "mistake_threshold_cp": self._engine.threshold_cp if self._engine else None,
         }
@@ -221,7 +225,7 @@ TOOL_SCHEMA = {
         "args": {},
     },
     "list_games": {
-        "description": f"One row per game with metadata, ECO code, opening name, total plies and first six plies. No engine. game_index 0 is the newest game. Rows are capped at {MAX_ROWS}; check `truncated` and page with offset.",
+        "description": f"One row per game with metadata, ECO code, opening name, total plies and first six plies (also as `first_moves_annotated`, each move tagged player or opponent). No engine. game_index 0 is the newest game. Rows are capped at {MAX_ROWS}; check `truncated` and page with offset.",
         "args": {
             "color": "'white' or 'black', optional: only games where the player had that color.",
             "offset": "int, optional, default 0: rows to skip.",
@@ -237,7 +241,7 @@ TOOL_SCHEMA = {
         },
     },
     "opening_sequences": {
-        "description": f"Groups the player's games of one color by their first N plies and reports games, W/D/L, score (wins + half draws over games), example game indexes and ECO codes per group. Rows capped at {MAX_ROWS}; check `truncated`.",
+        "description": f"Groups the player's games of one color by their first N plies and reports games, W/D/L, score (wins + half draws over games), example game indexes and ECO codes per group. Each row has `line_annotated`, `player_moves` and `opponent_moves` so you can tell whose move is whose (the player's color is `player_color`). Rows capped at {MAX_ROWS}; check `truncated`.",
         "args": {
             "color": COLOR_ARG,
             "depth_plies": f"int, optional, default 6, 1..{opening_facts.MAX_DEPTH_PLIES}: how many plies from move 1 define a group.",
@@ -246,7 +250,7 @@ TOOL_SCHEMA = {
         },
     },
     "move_distribution": {
-        "description": "For games of one color that start with a given move sequence, counts which move was played next, who played it (player or opponent), and how those games ended.",
+        "description": "For games of one color that start with a given move sequence, counts which move was played next, who played it (`played_by`: player or opponent), and how those games ended. Rows carry `line_annotated`.",
         "args": {
             "color": COLOR_ARG,
             "prefix": f"required; an empty list means the first move of the game. {LINE_NOTE}",
@@ -254,7 +258,7 @@ TOOL_SCHEMA = {
         },
     },
     "departure_points": {
-        "description": "Compares every game of one color against a reference line and reports the first ply where each game left it, who left it (player or opponent), the move played instead, and W/D/L for those games. Also counts games that followed the whole line or ended inside it.",
+        "description": "Compares every game of one color against a reference line and reports the first ply where each game left it, who left it (`departed_by`: player or opponent), the move played instead, the annotated line up to that move, and W/D/L for those games. Also counts games that followed the whole line or ended inside it.",
         "args": {
             "color": COLOR_ARG,
             "line": f"required, at least one move. {LINE_NOTE}",

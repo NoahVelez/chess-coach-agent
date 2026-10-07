@@ -24,9 +24,11 @@ from openai import OpenAI
 from agent.facts_store import TOOL_SCHEMA, FactsStore, call_tool
 
 MAX_ITERATIONS = 20  # valid model turns (tool calls + the final answer) before the cap forces a report
+AUDIT_ROUNDS = 1  # after a first final answer, the model gets this many chances to check and revise it
 MAX_FORMAT_RETRIES = 3  # consecutive malformed replies tolerated; these do not use up investigation turns
 DEFAULT_MODEL = "gpt-4o-mini"
 TEMPERATURE = 0.4
+ENGINE_TOOLS = ("analyze_game", "evaluate_position")
 
 # Keys every tool-calling turn must carry. Only the shape is checked, never the content.
 TURN_REASONING_KEYS = ("open_question", "why_this_next", "would_change_my_mind_if", "decision_so_far")
@@ -91,6 +93,15 @@ FORCED_FINAL_MESSAGE = (
 )
 
 
+AUDIT_MESSAGE = (
+    "Before this report is accepted, audit your own draft. Go through every claim, number, game index "
+    "and move in it and check each against the TOOL RESULTs above: is it there, and did you attribute "
+    "it to the right side (the player versus the opponent)? Is every recommendation backed by something "
+    "you actually queried? Fix or remove anything that is not. You may call a tool if you find a gap. "
+    'When done, reply with your final JSON object; if the draft already holds up, resend it unchanged.'
+)
+
+
 @dataclass
 class TurnRecord:
     turn: int
@@ -107,6 +118,8 @@ class AgentRun:
     turns_used: int
     model: str
     trail: list[TurnRecord] = field(default_factory=list)
+    audit: str = "not_run"  # "not_run" | "confirmed" | "revised"
+    conversation: list[dict] = field(default_factory=list)
 
 
 def get_model() -> str:
@@ -120,6 +133,7 @@ def run_coaching_agent(
     max_iterations: int = MAX_ITERATIONS,
     model: str | None = None,
     log: TextIO | None = None,
+    audit_rounds: int = AUDIT_ROUNDS,
 ) -> AgentRun:
     log = log or sys.stderr
     model = model or get_model()
@@ -132,35 +146,67 @@ def run_coaching_agent(
     ]
     trail: list[TurnRecord] = []
     turns_used = 0
+    engine_calls = 0
+    draft: str | None = None  # the report as first submitted, while the audit is pending
 
     def finish(report: str, status: str) -> AgentRun:
-        return AgentRun(report=report, status=status, turns_used=turns_used, model=model, trail=trail)
+        audit = "not_run"
+        if draft is not None:
+            audit = "confirmed" if report.strip() == draft.strip() else "revised"
+        return AgentRun(
+            report=report, status=status, turns_used=turns_used, model=model, trail=trail,
+            audit=audit, conversation=conversation,
+        )
 
     try:
         while turns_used < max_iterations:
             parsed = _next_valid_reply(session, conversation)
             if parsed is None:
+                if draft is not None:
+                    print("[agent] audit reply never parsed; keeping the first draft", file=log)
+                    return finish(draft, "final")
                 return finish(_fallback_report(trail, "model output never parsed after retries"), "unparseable")
             turns_used += 1
             _log_turn(log, turns_used, max_iterations, parsed)
             trail.append(_trail_entry(turns_used, parsed))
 
             if parsed["type"] == "final":
+                if draft is None and audit_rounds > 0 and turns_used < max_iterations:
+                    draft = parsed["report"]
+                    print("[agent] draft received; asking the model to audit it", file=log)
+                    conversation.append({"role": "user", "content": AUDIT_MESSAGE})
+                    continue
                 return finish(parsed["report"], "final")
 
-            conversation.append({"role": "user", "content": _run_tool(store, parsed)})
+            if parsed["name"] in ENGINE_TOOLS:
+                engine_calls += 1
+            tool_message = _run_tool(store, parsed)
+            budget = _budget_line(store, turns_used, max_iterations, engine_calls)
+            conversation.append({"role": "user", "content": f"{tool_message}\n{budget}"})
 
         conversation.append({"role": "user", "content": FORCED_FINAL_MESSAGE})
         print("[agent] iteration cap reached; forcing a final report", file=log)
         parsed = _next_valid_reply(session, conversation, final_only=True)
         if parsed is None:
+            if draft is not None:
+                return finish(draft, "cap_reached")
             return finish(_fallback_report(trail, "iteration cap reached and the forced report never parsed"), "unparseable")
         turns_used += 1
         trail.append(_trail_entry(turns_used, parsed))
         return finish(parsed["report"], "cap_reached")
     except openai.OpenAIError as exc:
         print(f"[agent] model call failed: {exc}", file=log)
+        if draft is not None:
+            return finish(draft, "final")
         return finish(_fallback_report(trail, f"model call failed: {exc}"), "model_error")
+
+
+def _budget_line(store: FactsStore, turns_used: int, cap: int, engine_calls: int) -> str:
+    """Plain facts about the run so far. Says nothing about what the model should do."""
+    return (
+        f"RUN STATUS: turns used {turns_used} of {cap}; engine tool calls so far {engine_calls}; "
+        f"games with engine analysis {store.engine_analyzed_games}."
+    )
 
 
 def _opening_message(store: FactsStore, username: str) -> str:

@@ -49,6 +49,7 @@ def final_reply(report="# Report\nDo X first."):
 
 
 def run(replies, **kwargs):
+    kwargs.setdefault("audit_rounds", 0)
     store = FactsStore([GameFacts(i, r) for i, r in enumerate(SAMPLE_GAMES)])
     client = ScriptedClient(replies)
     log = io.StringIO()
@@ -145,6 +146,71 @@ class LoopTests(unittest.TestCase):
             self.assertEqual(loop.get_model(), "gpt-x")
         with mock.patch.dict(os.environ, {}, clear=True):
             self.assertEqual(loop.get_model(), loop.DEFAULT_MODEL)
+
+
+class BudgetLineTests(unittest.TestCase):
+    def test_tool_results_carry_plain_run_status_facts(self):
+        _, client, _ = run([tool_reply("get_player_profile"), final_reply()])
+        message = client.requests[1]["messages"][-1]["content"]
+        self.assertIn("RUN STATUS: turns used 1 of 20; engine tool calls so far 0; games with engine analysis 0.", message)
+
+    def test_status_line_has_no_instructions(self):
+        line = loop._budget_line(FactsStore([]), 3, 20, 2).lower()
+        for word in ("should", "must", "try", "consider", "use "):
+            self.assertNotIn(word, line)
+
+    def test_engine_calls_are_counted(self):
+        _, client, _ = run(
+            [tool_reply("evaluate_position", {"moves": ["e4"]}), tool_reply("get_player_profile"), final_reply()]
+        )
+        self.assertIn("engine tool calls so far 1", client.requests[2]["messages"][-1]["content"])
+
+
+class AuditTests(unittest.TestCase):
+    def test_audit_message_follows_first_final_and_revision_is_used(self):
+        result, client, log = run([final_reply("# Draft"), final_reply("# Revised")], audit_rounds=1)
+        self.assertEqual((result.report, result.audit, result.status), ("# Revised", "revised", "final"))
+        self.assertEqual(result.turns_used, 2)
+        self.assertEqual(client.requests[1]["messages"][-1]["content"], loop.AUDIT_MESSAGE)
+        self.assertIn("asking the model to audit", log)
+
+    def test_unchanged_draft_is_confirmed(self):
+        result, _, _ = run([final_reply("# Same"), final_reply("# Same")], audit_rounds=1)
+        self.assertEqual((result.report, result.audit), ("# Same", "confirmed"))
+
+    def test_audit_may_call_a_tool_before_the_final(self):
+        result, client, _ = run(
+            [final_reply("# Draft"), tool_reply("get_player_profile"), final_reply("# Checked")], audit_rounds=1
+        )
+        self.assertEqual((result.report, result.audit, result.turns_used), ("# Checked", "revised", 3))
+
+    def test_only_one_audit_round(self):
+        result, client, _ = run([final_reply("# A"), final_reply("# B")], audit_rounds=1)
+        self.assertEqual(len(client.requests), 2)
+
+    def test_unparseable_audit_keeps_first_draft(self):
+        result, _, _ = run([final_reply("# Draft")] + ["garbage"] * 6, audit_rounds=1)
+        self.assertEqual((result.report, result.status, result.audit), ("# Draft", "final", "confirmed"))
+
+    def test_model_error_during_audit_keeps_first_draft(self):
+        err = openai.APIConnectionError(request=httpx.Request("POST", "http://test"))
+        result, _, _ = run([final_reply("# Draft"), err], audit_rounds=1)
+        self.assertEqual((result.report, result.status), ("# Draft", "final"))
+
+    def test_final_on_the_last_turn_is_not_audited(self):
+        result, client, _ = run([tool_reply("get_player_profile"), final_reply("# Late")], audit_rounds=1, max_iterations=2)
+        self.assertEqual((result.report, result.audit, result.status), ("# Late", "not_run", "final"))
+        self.assertEqual(len(client.requests), 2)
+
+    def test_audit_message_has_no_chess_question_list(self):
+        text = loop.AUDIT_MESSAGE.lower()
+        for phrase in ("opening", "castle", "as white", "as black", "alternative"):
+            self.assertNotIn(phrase, text)
+
+    def test_conversation_is_returned_for_transcripts(self):
+        result, _, _ = run([final_reply()])
+        self.assertEqual(result.conversation[0]["role"], "system")
+        self.assertEqual(result.conversation[-1]["role"], "assistant")
 
 
 class PromptTests(unittest.TestCase):

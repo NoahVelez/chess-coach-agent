@@ -110,6 +110,39 @@ class OpeningSequencesTests(unittest.TestCase):
             of.opening_sequences(SAMPLE_GAMES, "white", perspective="vibes")
 
 
+class SideAttributionTests(unittest.TestCase):
+    def test_annotate_line_tags_each_move_for_both_colors(self):
+        self.assertEqual(of.annotate_line("white", ["e4", "c6", "d4"]), "1.e4(player) c6(opponent) 2.d4(player)")
+        self.assertEqual(of.annotate_line("black", ["e4", "c6"]), "1.e4(opponent) c6(player)")
+        self.assertEqual(of.annotate_line("white", []), "")
+
+    def test_opening_rows_separate_player_and_opponent_moves(self):
+        games = [make_record("white", ["e4", "c6", "d4", "d5"], "loss")]
+        row = of.opening_sequences(games, "white", 4)["rows"][0]
+        self.assertEqual(row["player_color"], "white")
+        self.assertEqual(row["player_moves"], ["e4", "d4"])
+        self.assertEqual(row["opponent_moves"], ["c6", "d5"])
+        self.assertIn("c6(opponent)", row["line_annotated"])
+
+    def test_player_moves_only_does_not_claim_opponent_moves(self):
+        row = of.opening_sequences(SAMPLE_GAMES, "white", 4, perspective="player_moves_only")["rows"][0]
+        self.assertNotIn("line_annotated", row)
+        self.assertIsInstance(row["opponent_moves"], str)
+
+    def test_distribution_and_departure_rows_name_the_mover(self):
+        dist = of.move_distribution(SAMPLE_GAMES, "white", ["e4"])
+        self.assertEqual({r["played_by"] for r in dist["rows"]}, {"opponent"})
+        self.assertEqual(dist["prefix_annotated"], "1.e4(player)")
+        dep = of.departure_points(SAMPLE_GAMES, "white", RUY_MAIN)
+        row = next(r for r in dep["rows"] if r["move_played"] == "Nf6")
+        self.assertEqual(row["line_annotated"], "1.e4(player) e5(opponent) 2.Nf3(player) Nc6(opponent) 3.Bb5(player) Nf6(opponent)")
+        self.assertEqual(row["player_color"], "white")
+
+    def test_list_games_first_moves_annotated(self):
+        row = of.list_games(SAMPLE_GAMES, color="black")["rows"][0]
+        self.assertTrue(row["first_moves_annotated"].startswith("1.d4(opponent) d5(player)"))
+
+
 class MoveDistributionTests(unittest.TestCase):
     def test_player_move_after_prefix(self):
         result = of.move_distribution(SAMPLE_GAMES, "white", ["e4", "e5", "Nf3", "Nc6"])
