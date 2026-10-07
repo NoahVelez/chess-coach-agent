@@ -30,10 +30,11 @@ first, with evidence.
   what it finds.
 - The loop is hand-rolled (`agent/loop.py`): send conversation -> parse a JSON reply as
   either a tool call or a final report -> run the tool myself -> feed the result back.
-  Capped at 20 turns. A malformed reply gets a corrective message without using up a turn.
+  Capped at 20 turns. After its first final answer the model gets one self-audit round to
+  re-check every claim against the tool results it saw. A malformed reply gets a corrective message without using up a turn.
   If the cap is hit, one last forced call makes the model write the best report it can.
 - **Output**: each run writes exactly one Markdown file to `reports/`
-  (`<username>_<YYYYMMDD-HHMMSS>.md`). `main.py` adds a short header (username, games,
+  (`<username>_<YYYYMMDD-HHMMSS>.md`) and the full conversation to `logs/` (gitignored). `main.py` adds a short header (username, games,
   date, model, turns); the sections are the agent's own choice.
 
 ## Setup
@@ -48,6 +49,9 @@ first, with evidence.
 3. Copy `.env.example` to `.env` and fill in:
    - `OPENAI_API_KEY` — your OpenAI API key
    - `STOCKFISH_PATH` — full path to `stockfish.exe` (optional if it's already on `PATH`)
+   - `OPENAI_MODEL` — optional, defaults to `gpt-5.4-mini`. In testing, `gpt-4o-mini` and
+     `gpt-4o` produced unranked reports and misread some figures. Whichever model you use,
+     check the evidence a report cites against the transcript in `logs/`.
 
 ## Run
 
@@ -81,5 +85,6 @@ tools/           facts-only: Chess.com fetch + PGN facts, opening/style aggregat
 agent/           the loop, the facts store and tool router, the judgment calls
 main.py          CLI entry point; writes the one report per run
 reports/         generated reports (one per run)
+logs/            full conversation per run (gitignored)
 tests/           offline unit tests
 ```

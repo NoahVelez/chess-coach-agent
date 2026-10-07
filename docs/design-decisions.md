@@ -37,6 +37,10 @@ flowchart LR
 | Fixed depth and threshold | Same ruler for every position; flags candidates, never verdicts |
 | Size-bounded results with `truncated` | A long investigation cannot overflow the context window |
 | Format retries separate from turns | A malformed reply should not burn an investigation turn |
+| One self-audit round after the first final | Models misread or mis-added figures; a generic check against their own tool results catches some of it without telling them what to ask |
+| Run status line after each tool result | The model can see turns and engine use; facts only, no instructions |
+| Every move tagged player/opponent in tool rows | Flat move lists got misattributed to the wrong side |
+| Transcripts in gitignored `logs/` | Claims can be audited afterwards; `reports/` still gets exactly one file |
 | Forced final report at the cap | A run always ends with a decision-bearing report instead of a canned failure |
 | One report per run, written by code | The durable artifact is deterministic; sections are the agent's choice |
 | Bullet and daily games excluded | Bullet is too fast to reflect real decision-making |
@@ -65,7 +69,7 @@ These branches are examples of paths a model might take. Which tools run, how ma
 ## Known limits
 
 - Lines are matched by move order, not position, so transpositions are not merged.
-- Report quality depends on the model. With the default `gpt-4o-mini` the agent often finishes after a handful of turns without using the engine, and its reports can misstate lines; a stronger model does somewhat better. The loop checks the shape of each turn, not whether claims are true.
+- Report quality depends on the model. In testing `gpt-4o-mini` and `gpt-4o` skipped ranking, confidence and rejected ideas and misread figures; the default `gpt-5.4-mini` followed the standards and its spot-checked figures were right. It still over-reads small samples and used the engine only once. The loop checks the shape of each turn, not whether claims are true; the audit round is a model checking itself, not a guarantee.
 - Mistake candidates cover both players' moves; the `mover` field says which side made each.
 - History lookup stops at 24 months, so inactive accounts return no games.
 

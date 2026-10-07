@@ -33,7 +33,7 @@ Environment variables (template: [.env.example](../.env.example)):
 |----------|----------|---------|
 | `OPENAI_API_KEY` | yes | Read by the OpenAI client |
 | `STOCKFISH_PATH` | optional if `stockfish` is on `PATH` | Full path to the Stockfish binary; used first if the path exists |
-| `OPENAI_MODEL` | no | Model for the agent loop; default `gpt-4o-mini`. A stronger model may decide and cite more reliably |
+| `OPENAI_MODEL` | no | Model for the agent loop; default `gpt-5.4-mini`. `gpt-4o-mini` and `gpt-4o` gave unranked, less accurate reports in testing |
 
 ## Run
 
@@ -49,6 +49,8 @@ Environment variables (template: [.env.example](../.env.example)):
 | `--max-turns` | `20` | Agent turn cap before a report is forced |
 
 Only rapid and blitz standard-chess games from the player's public history are used, looking back at most 24 months. Progress and the agent's per-turn `open_question` / `why_this_next` / `decision_so_far` go to stderr; the report path goes to stdout. Stockfish runs only when the agent asks for it (about 10 seconds for a long game at depth 14).
+
+The full conversation (every tool result the model saw) is written to `logs/<username>_<timestamp>.jsonl`, which is gitignored; its path is printed to stderr. Use it to check a report's claims.
 
 Exit code is 0 for a normal or cap-reached report and 2 when the run ended with only a reasoning-trail report.
 

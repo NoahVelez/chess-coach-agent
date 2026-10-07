@@ -27,6 +27,8 @@ flowchart LR
     CACHE -.-> T7
 ```
 
+Rows from `opening_sequences`, `move_distribution`, `departure_points` and `list_games` tag every move with who played it (`line_annotated` such as `1.e4(player) c6(opponent)`), and carry `player_color`, `player_moves` / `opponent_moves` (full-line grouping) or `played_by` / `departed_by`. In `player_moves_only` grouping the opponent's moves are not part of the group.
+
 Lines are matched by move order (SAN), so transpositions are not merged. A line can be a list (`["e4","e5"]`) or a string (`"1. e4 e5"`); `+ # ! ?` suffixes are ignored.
 
 ## Reference

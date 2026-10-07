@@ -29,9 +29,12 @@ sequenceDiagram
         end
         FS-->>AG: facts or error
     end
-    LLM-->>AG: final (report body)
+    LLM-->>AG: first final (draft report)
+    AG->>LLM: audit message
+    LLM-->>AG: final (checked report body)
     AG-->>CLI: AgentRun
     CLI->>FSYS: header + report body, one new file
+    CLI->>FSYS: full conversation to logs/ (gitignored)
     CLI-->>User: report path on stdout
 ```
 

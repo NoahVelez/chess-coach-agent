@@ -26,7 +26,7 @@ from agent.facts_store import TOOL_SCHEMA, FactsStore, call_tool
 MAX_ITERATIONS = 20  # valid model turns (tool calls + the final answer) before the cap forces a report
 AUDIT_ROUNDS = 1  # after a first final answer, the model gets this many chances to check and revise it
 MAX_FORMAT_RETRIES = 3  # consecutive malformed replies tolerated; these do not use up investigation turns
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_MODEL = "gpt-5.4-mini"
 TEMPERATURE = 0.4
 ENGINE_TOOLS = ("analyze_game", "evaluate_position")
 
@@ -97,7 +97,11 @@ AUDIT_MESSAGE = (
     "Before this report is accepted, audit your own draft. Go through every claim, number, game index "
     "and move in it and check each against the TOOL RESULTs above: is it there, and did you attribute "
     "it to the right side (the player versus the opponent)? Is every recommendation backed by something "
-    "you actually queried? Fix or remove anything that is not. You may call a tool if you find a gap. "
+    "you actually queried? Check the arithmetic: wins, losses and scores must agree with each other. Then check the report "
+    "against the standards in your instructions: recommendations ranked with what to do first; for each "
+    "major finding a claim, evidence, confidence level and concrete action; at least one idea you "
+    "rejected and why; samples too small to conclude flagged with their counts. "
+    "Fix or remove anything that fails. You may call a tool if you find a gap. "
     'When done, reply with your final JSON object; if the draft already holds up, resend it unchanged.'
 )
 

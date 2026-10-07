@@ -27,7 +27,8 @@ stateDiagram-v2
     ShapeCheck --> AwaitModel: malformed, corrective message (retry counter)
     ShapeCheck --> Failed: more than MAX_FORMAT_RETRIES in a row
     ShapeCheck --> RunTool: valid tool turn
-    ShapeCheck --> Done: valid final turn
+    ShapeCheck --> AwaitModel: first valid final, audit message appended
+    ShapeCheck --> Done: final after audit (or no audit possible)
     RunTool --> AwaitModel: result or error fact appended
     AwaitModel --> ForcedFinal: valid turns reached MAX_ITERATIONS
     ForcedFinal --> CapReached: valid final
@@ -42,7 +43,8 @@ stateDiagram-v2
 |----------|-------|---------|
 | `MAX_ITERATIONS` | 20 | Valid model turns before a report is forced (`--max-turns` overrides) |
 | `MAX_FORMAT_RETRIES` | 3 | Consecutive malformed replies tolerated; they do not use turns |
-| `DEFAULT_MODEL` | `gpt-4o-mini` | Overridden by `OPENAI_MODEL` |
+| `AUDIT_ROUNDS` | 1 | Self-audit rounds after the first final answer |
+| `DEFAULT_MODEL` | `gpt-5.4-mini` | Overridden by `OPENAI_MODEL` |
 | `TEMPERATURE` | 0.4 | Dropped automatically if the model rejects it |
 
 `response_format={"type": "json_object"}` is sent; if the model rejects it (or `temperature`), the session drops that parameter and retries.
@@ -57,7 +59,9 @@ flowchart TD
     Q -->|"no"| A
     Q -->|"yes"| F["Fallback report: reasoning trail"]
     B -->|"yes"| C{"type"}
-    C -->|"final, with report and decision"| D["Return report"]
+    C -->|"first final, turns remain"| AU["Keep draft, append audit message"]
+    AU --> A
+    C -->|"final, audit done or not possible"| D["Return report"]
     C -->|"tool, with all reasoning fields"| E["Log open_question / decision_so_far"]
     C -->|"anything else"| R
     E --> G["call_tool via FactsStore"]
@@ -67,6 +71,12 @@ flowchart TD
     I --> J
     J --> A
 ```
+
+## Run status line and self-audit
+
+After every tool result the loop appends one plain-facts line, for example `RUN STATUS: turns used 4 of 20; engine tool calls so far 1; games with engine analysis 1.` It carries no advice.
+
+When the model sends its first valid `final` and turns remain, the loop appends a fixed audit message (`AUDIT_MESSAGE`): check every claim, number, game index and move against the tool results, check who made each move (player vs. opponent), check the arithmetic, check the report against the stated standards (ranking, confidence, rejected idea, small samples), then resend or revise. The model may call a tool during the audit. Only one round runs, it is skipped when the first final lands on the last turn, and if the audit reply fails to parse or the model call errors the first draft is kept. The report header shows `Self-audit:` as not run, kept unchanged, or revised.
 
 ## A typical run
 
