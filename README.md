@@ -1,62 +1,60 @@
-# Chess Coach Agent
+# Chess Coach
 
-Mini-project for BUAN 6V99 — Agentic AI & Process Automation.
+Chess Coach looks at a player's recent public Chess.com rapid and blitz games and creates a short, evidence-backed report about what to work on next. Python gathers game facts, an AI model decides what to investigate and what those facts may mean, and Stockfish evaluates positions when asked.
 
-## Problem
+## How it works
 
-Stockfish can tell you that a move lost 2.5 points of evaluation. It cannot tell you
-*what the player should learn from it*. The same blunder deserves a different lesson
-depending on who made it: "check what's attacked before you move" is the right takeaway
-for one player and condescending to another who miscalculated a deeper line. Picking the
-most useful coaching lesson — calculation discipline, piece safety, an opening principle,
-a tactical motif, or something else — is a judgment call that two good coaches could make
-differently from identical engine output. That's the one decision this agent exists to make.
+```mermaid
+flowchart LR
+    A["Choose a Chess.com username"] --> B["Load recent public rapid/blitz games"]
+    B --> C["The coach explores game evidence"]
+    C -. "when useful" .-> D["Stockfish checks a game or position"]
+    D --> C
+    C --> E["Write and check a coaching report"]
+    E --> F["Open the report in reports/"]
+```
 
-## How it decides (the agent vs. the facts)
+## Get started
 
-- **Facts (deterministic, no judgment)**: `tools/chess_com.py` pulls a player's recent
-  games from the public Chess.com API. `tools/stockfish_tool.py` runs each game through a
-  local Stockfish engine and reports, per move: the eval before/after, the swing in
-  centipawns, and whether that swing crosses a fixed threshold (100 cp). These modules
-  never decide what a mistake *means* — they only measure.
-- **Judgment (the model)**: `agent/loop.py` runs a real loop against the OpenAI API. The
-  model is handed tool access to those facts — game summaries, full move lists, player
-  rating/record — and decides for itself which games to inspect, which mistake(s) are
-  worth coaching on, what category of lesson they represent, and how to phrase that for
-  this specific player. It can call tools multiple times (e.g. pull full move context
-  around a specific mistake) before it commits to a final report. The path it takes
-  depends entirely on what it finds — nothing here is scripted.
-- The loop is hand-rolled (`agent/loop.py`): send conversation → parse a JSON reply as
-  either a tool call or a final report → run the tool myself → feed the result back.
-  Capped at 8 turns so a stuck loop can't run away on API cost.
+You will need Python 3.10 or newer, an [OpenAI API key](https://platform.openai.com/api-keys), Stockfish, and a Chess.com account with public rapid or blitz games from the last two years.
 
-## Setup
-
-1. Install [Stockfish](https://stockfishchess.org/) (e.g. `winget install Stockfish.Stockfish`
-   on Windows), or point `STOCKFISH_PATH` at an existing binary.
-2. Create a virtual environment and install dependencies:
-   ```powershell
-   python -m venv .venv
-   .venv\Scripts\pip install -r requirements.txt
-   ```
-3. Copy `.env.example` to `.env` and fill in:
-   - `OPENAI_API_KEY` — your OpenAI API key
-   - `STOCKFISH_PATH` — full path to `stockfish.exe` (optional if it's already on `PATH`)
-
-## Run
+In PowerShell, open the project folder and run:
 
 ```powershell
-.venv\Scripts\python main.py <chess.com-username> --games 15
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt
+Copy-Item .env.example .env
 ```
 
-Only analyzes rapid and blitz games (bullet games are excluded as too fast to reflect
-real decision-making). Uses only the given player's own public Chess.com game history —
-no private or third-party data.
+Add your key to `.env` as `OPENAI_API_KEY=your-key` (without quotation marks). Keep the key private. The default model is `gpt-5.4-mini`; you can change it with `OPENAI_MODEL`. Install [Stockfish](https://stockfishchess.org/) (on Windows, `winget install Stockfish.Stockfish`). If it is not found automatically, set `STOCKFISH_PATH` in `.env` to the full path of `stockfish.exe`.
 
-## Project layout
+## Create a report
 
+Replace `YOUR_CHESSCOM_NAME` with the player's Chess.com username:
+
+```powershell
+.\.venv\Scripts\python main.py YOUR_CHESSCOM_NAME --games 40
 ```
-tools/           facts-only: Chess.com fetch, Stockfish analysis
-agent/           the loop, the tool router, the one judgment call
-main.py          CLI entry point
+
+The program prints the report's location when it finishes. Reports are saved as Markdown files in `reports/`. The conversation and tool results are saved in `logs/` so you can trace the report's claims to the evidence.
+
+| Option | Default | What it does |
+|---|---:|---|
+| `--games` | `40` | Number of recent rapid and blitz games to load |
+| `--threshold` | `100` | Centipawn evaluation drop that flags a move for review |
+| `--max-turns` | `20` | Maximum investigation turns before the coach must report |
+
+Stockfish is available if the coach asks for engine evidence, but it does not analyze every game automatically. A flagged move is worth reviewing, not necessarily a mistake. If the coach reaches its turn limit or cannot finish normally, treat the report as an incomplete reasoning trail rather than a completed recommendation. The AI's self-check can help catch unsupported claims, but it does not guarantee that every conclusion is correct; review the report and its evidence.
+
+## Run offline tests
+
+The tests use sample games and substitutes, so they do not contact Chess.com or OpenAI or run Stockfish:
+
+```powershell
+.\.venv\Scripts\python -m unittest discover -s tests -t .
 ```
+
+## Learn more
+
+- [Set Up and Use the Chess Coach](docs/setup-and-usage.md) — full setup instructions, options, and troubleshooting.
+- [How the Chess Coach Agent Works](docs/agentic-workflow.md) — how the tools, AI model, and Stockfish work together.

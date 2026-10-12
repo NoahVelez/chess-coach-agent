@@ -1,9 +1,9 @@
 ---
-description: "Scaffold the BUAN 6V99 mini-project: a hand-rolled Python agent that pulls a player's Chess.com games, gets objective facts from Stockfish, and uses an LLM to judge the coaching takeaway for each mistake."
-agent: "agent"
+name: build-chess-coach-agent
+description: Scaffold the BUAN 6V99 mini-project: a hand-rolled Python agent that pulls a player's Chess.com games, gets objective facts from Stockfish, and uses an LLM to judge the coaching takeaway for each mistake.
+disable-model-invocation: true
 argument-hint: "Chess.com username and number of recent games to analyze (defaults: ask the user)"
 ---
-
 Build the mini-project described in [mini_project_brief.md](../../requirements/mini_project_brief.md), constrained by [what_counts_as_an_agent.md](../../requirements/what_counts_as_an_agent.md), and motivated by the problem framed in [discussion_with_professor.md](../../requirements/discussion_with_professor.md).
 
 ## Problem
