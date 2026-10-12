@@ -76,7 +76,7 @@ no private or third-party data.
 
 ## Documentation
 
-Detailed docs with diagrams live in [docs/index.md](docs/index.md).
+Setup instructions and links to the project guides are in [docs/setup-and-usage.md](docs/setup-and-usage.md).
 
 ## Project layout
 

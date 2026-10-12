@@ -136,4 +136,4 @@ Unknown tool, missing or unexpected arguments, a non-object `args`, out-of-range
 - [agent-loop.md](agent-loop.md)
 - [data-flow.md](data-flow.md)
 - [architecture.md](architecture.md)
-- [index.md](index.md)
+- [setup-and-usage.md](setup-and-usage.md)

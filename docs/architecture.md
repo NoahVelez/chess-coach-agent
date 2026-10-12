@@ -122,4 +122,4 @@ No tool ranks lines, names a style, or recommends anything, and there is no open
 - [agent-loop.md](agent-loop.md)
 - [tools.md](tools.md)
 - [design-decisions.md](design-decisions.md)
-- [index.md](index.md)
+- [setup-and-usage.md](setup-and-usage.md)

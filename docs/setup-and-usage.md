@@ -1,87 +1,110 @@
-# Setup and Usage
+# Set Up and Use the Chess Coach
 
-Install Stockfish and the Python dependencies, add your OpenAI key to `.env`, then run `main.py` with a Chess.com username. Each run writes one report to `reports/`.
+This guide gets the chess coach running on your computer. You will need Python, a Stockfish chess engine, and an OpenAI API key. The program downloads recent public rapid and blitz games for a Chess.com username, then writes a coaching report.
 
-## Setup
-
-```mermaid
-flowchart TD
-    A["Install Stockfish<br/>e.g. winget install Stockfish.Stockfish"] --> B["python -m venv .venv"]
-    B --> C[".venv\Scripts\pip install -r requirements.txt"]
-    C --> D["Copy .env.example to .env"]
-    D --> E["Set OPENAI_API_KEY"]
-    E --> F{"Stockfish on PATH?"}
-    F -->|"yes"| G["STOCKFISH_PATH optional"]
-    F -->|"no"| H["Set STOCKFISH_PATH to stockfish.exe"]
-    G --> I["Optional: set OPENAI_MODEL"]
-    H --> I
-    I --> R(["Ready to run"])
-```
-
-Dependencies ([requirements.txt](../requirements.txt)):
-
-| Package | Version | Used for |
-|---------|---------|----------|
-| `chess` | 1.11.1 | PGN parsing, UCI engine control |
-| `requests` | 2.32.3 | Chess.com API |
-| `openai` | 1.59.7 | Agent loop model calls |
-| `python-dotenv` | 1.0.1 | Loading `.env` |
-
-Environment variables (template: [.env.example](../.env.example)):
-
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `OPENAI_API_KEY` | yes | Read by the OpenAI client |
-| `STOCKFISH_PATH` | optional if `stockfish` is on `PATH` | Full path to the Stockfish binary; used first if the path exists |
-| `OPENAI_MODEL` | no | Model for the agent loop; default `gpt-5.4-mini`. `gpt-4o-mini` and `gpt-4o` gave unranked, less accurate reports in testing |
-
-## Run
-
-```powershell
-.venv\Scripts\python main.py <chess.com-username> --games 40
-```
-
-| Argument | Default | Meaning |
-|----------|---------|---------|
-| `username` | required | Chess.com username to analyze |
-| `--games` | `40` | Number of recent rapid/blitz games to load |
-| `--threshold` | `100` | Centipawn swing that flags a mistake candidate (fixed for the run) |
-| `--max-turns` | `20` | Agent turn cap before a report is forced |
-
-Only rapid and blitz standard-chess games from the player's public history are used, looking back at most 24 months. Progress and the agent's per-turn `open_question` / `why_this_next` / `decision_so_far` go to stderr; the report path goes to stdout. Stockfish runs only when the agent asks for it (about 10 seconds for a long game at depth 14).
-
-The full conversation (every tool result the model saw) is written to `logs/<username>_<timestamp>.jsonl`, which is gitignored; its path is printed to stderr. Use it to check a report's claims.
-
-Exit code is 0 for a normal or cap-reached report and 2 when the run ended with only a reasoning-trail report.
-
-## Tests
-
-```powershell
-.venv\Scripts\python -m unittest discover -s tests -t .
-```
-
-Offline: fixture games, a fake engine and a scripted fake OpenAI client; no network, no Stockfish, no API key.
-
-## Troubleshooting
+## What happens when you run it?
 
 ```mermaid
-flowchart TD
-    S["Run failed or odd output"] --> Q1{"Message: Could not find<br/>a Stockfish binary?"}
-    Q1 -->|"yes"| A1["Install Stockfish and set STOCKFISH_PATH<br/>to a path that exists, or add it to PATH"]
-    Q1 -->|"no"| Q2{"Message: No rapid/blitz<br/>games found?"}
-    Q2 -->|"yes"| A2["Check username spelling; account needs<br/>rapid or blitz games in the last 24 months"]
-    Q2 -->|"no"| Q3{"requests.HTTPError?"}
-    Q3 -->|"yes"| A3["Chess.com API error or rate limit;<br/>retry later"]
-    Q3 -->|"no"| Q4{"Report says Incomplete run<br/>and exit code 2?"}
-    Q4 -->|"yes"| A4["Check stderr: model call failed,<br/>usually OPENAI_API_KEY or network"]
-    Q4 -->|"no"| Q5{"Report says Cap reached?"}
-    Q5 -->|"yes"| A5["Agent used all turns: raise --max-turns<br/>or lower --games"]
-    Q5 -->|"no"| A6["Check stderr turn log and agent-loop.md"]
+flowchart LR
+    A["Enter a Chess.com username"] --> B["Load recent public rapid/blitz games"]
+    B --> C["Agent investigates game facts"]
+    C --> D["Agent writes and checks a coaching report"]
+    D --> E["Report saved in reports/"]
 ```
 
-## See also
+## Before you start
 
-- [data-flow.md](data-flow.md)
-- [agent-loop.md](agent-loop.md)
-- [README.md](../README.md)
-- [index.md](index.md)
+- Install Python 3.10 or newer.
+- Install [Stockfish](https://stockfishchess.org/). On Windows, you can use:
+  ```powershell
+  winget install Stockfish.Stockfish
+  ```
+- Have an OpenAI API key ready. Keep it private; do not share it or publish it.
+- Use a Chess.com username with public rapid or blitz games from the last two years.
+
+## Install the project
+
+Open PowerShell in the project folder and run:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt
+Copy-Item .env.example .env
+```
+
+Open the new `.env` file and replace the example value for `OPENAI_API_KEY` with your own key. Do not include quotation marks. If Stockfish is not found automatically, set `STOCKFISH_PATH` to the full path of `stockfish.exe`, for example:
+
+```text
+STOCKFISH_PATH=C:\path\to\stockfish.exe
+```
+
+You can leave `OPENAI_MODEL` unchanged to use the default model, `gpt-5.4-mini`.
+
+## Run a report
+
+Replace `YOUR_CHESSCOM_NAME` with the player's Chess.com username:
+
+```powershell
+.\.venv\Scripts\python main.py YOUR_CHESSCOM_NAME --games 40
+```
+
+The program prints the report's file path when it finishes. Open that Markdown file in `reports/`.
+
+Useful options:
+
+| Option | Default | What it changes |
+|---|---:|---|
+| `--games` | `40` | How many recent rapid and blitz games to load |
+| `--threshold` | `100` | Engine score drop, in centipawns, that flags a move for review |
+| `--max-turns` | `20` | Maximum number of investigation turns before the agent must report |
+
+For example, to analyze up to 20 games:
+
+```powershell
+.\.venv\Scripts\python main.py YOUR_CHESSCOM_NAME --games 20
+```
+
+The agent may not analyze every game with Stockfish. It asks the engine about games or positions when it needs that evidence. The Stockfish program must still be installed so it is available if requested.
+
+## Understand the files
+
+- `reports/` contains one Markdown coaching report per run.
+- `logs/` contains the conversation and tool results used during a run. Use it to trace report claims back to evidence.
+- Progress messages appear in the PowerShell window while the program runs.
+
+A report may note that the agent reached its turn limit or could not finish normally. Treat an incomplete report as a reasoning trail, not a completed coaching recommendation.
+
+## Run the offline tests
+
+To check the project without contacting Chess.com or OpenAI or running Stockfish:
+
+```powershell
+.\.venv\Scripts\python -m unittest discover -s tests -t .
+```
+
+The tests use sample games and substitutes for external services.
+
+## Common problems
+
+| What you see | What to check |
+|---|---|
+| “Could not find a Stockfish binary” | Install Stockfish, or set `STOCKFISH_PATH` to the location of `stockfish.exe`. |
+| “No rapid/blitz games found” | Check the username and whether the account has public rapid or blitz games in the last 24 months. |
+| An OpenAI authentication error | Check that `.env` contains a valid `OPENAI_API_KEY`. |
+| An incomplete report | Check the error printed in PowerShell and the run transcript in `logs/`. |
+| A “Cap reached” note | The agent used its allowed turns. Try fewer games or increase `--max-turns`. |
+
+For a plain-language explanation of how the agent investigates and reaches its recommendations, see [Agentic Workflow](agentic-workflow.md).
+
+## More about the project
+
+Python gathers and checks game facts, the AI model chooses what to investigate and how to interpret the evidence, and Stockfish evaluates positions when asked. The project is organized around those responsibilities:
+
+| Guide | What it explains |
+|---|---|
+| [Agentic Workflow](agentic-workflow.md) | The model's API calls, decision loop, evidence checks, report output, and course criteria |
+| [Architecture](architecture.md) | How the main parts of the code fit together |
+| [Agent Loop](agent-loop.md) | How the model's turns, tool requests, retries, and turn limit work |
+| [Tools](tools.md) | The facts each analysis tool can provide |
+| [Data Flow](data-flow.md) | How game data moves through the program and becomes a report |
+| [Design Decisions](design-decisions.md) | Why the agent works this way and which choices belong to code or the model |

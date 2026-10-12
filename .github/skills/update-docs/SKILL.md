@@ -28,28 +28,27 @@ Create/refresh these files in `docs/` (adjust only if the code clearly warrants 
 
 | File | Purpose | Required diagrams |
 |------|---------|-------------------|
-| `docs/index.md` | Landing page: what the project is, doc map, quick-start pointer | High-level flowchart of the whole system; doc-map flowchart linking to the other docs |
 | `docs/architecture.md` | Modules, responsibilities, and boundaries (agent vs. tools vs. CLI) | Component/flowchart of modules; `classDiagram` of key classes/functions; the "facts vs. judgment" boundary |
 | `docs/agent-loop.md` | How the agent loop works: history, iteration cap, parsing tool calls vs. `FINAL:` | `stateDiagram-v2` of loop states; `flowchart` of one iteration; `sequenceDiagram` of a typical multi-step run; early-exit/error paths |
 | `docs/tools.md` | Reference for each tool: inputs, outputs, facts-only guarantee, thresholds | Per-tool flowchart; `erDiagram` or `classDiagram` of returned data shapes |
 | `docs/data-flow.md` | End-to-end path from CLI input to coaching report | End-to-end `sequenceDiagram` (user → CLI → agent → LLM → tools → Chess.com/Stockfish → report); `flowchart` of how facts are stored and re-used |
-| `docs/setup-and-usage.md` | Install, Stockfish setup, `.env`, run commands, troubleshooting | Setup flowchart; troubleshooting decision-tree flowchart |
+| `docs/setup-and-usage.md` | Landing page and setup: project overview, doc map, Stockfish setup, `.env`, run commands, troubleshooting | Setup flowchart; project guide map |
 | `docs/design-decisions.md` | Why it's a hand-rolled agent, what's deterministic vs. model-judged, constraints from the course guide | Flowchart contrasting rule-based vs. model-judged decisions; diagram of how the path varies per run |
 
-If the code contains subsystems not covered above (e.g., the facts store), cover them in the most relevant doc or add a new file and link it from `docs/index.md`.
+If the code contains subsystems not covered above (e.g., the facts store), cover them in the most relevant doc or add a new file and link it from `docs/setup-and-usage.md`.
 
 ## Conventions for every doc
 
 1. Start with a `#` title and a 1–2 sentence summary.
 2. Link to source files with relative paths (e.g., `[loop.py](../agent/loop.py)`), and link sibling docs to each other.
 3. End with a short "See also" list of related docs.
-4. Cross-check that README.md and `docs/` agree (commands, setup, tool names). Make minimal edits to README.md only to add a link to `docs/index.md` or to fix contradictions.
+4. Cross-check that README.md and `docs/` agree (commands, setup, tool names). Make minimal edits to README.md only to link to `docs/setup-and-usage.md` or to fix contradictions.
 
 ## Verify before finishing
 
 - Every Mermaid block parses (check syntax carefully; if a Mermaid CLI such as `npx @mermaid-js/mermaid-cli` is available, validate with it, otherwise review manually).
 - Every relative link points to an existing file.
 - Every tool name, function, CLI flag, env var, and numeric threshold in the docs matches the code.
-- `docs/index.md` links to every other doc.
+- `docs/setup-and-usage.md` links to every other doc.
 
 Finish with a brief summary: which docs were created vs. updated, and any code/README inconsistencies you noticed but did not change.
