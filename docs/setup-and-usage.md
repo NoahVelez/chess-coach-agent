@@ -102,9 +102,4 @@ Python gathers and checks game facts, the AI model chooses what to investigate a
 
 | Guide | What it explains |
 |---|---|
-| [Agentic Workflow](agentic-workflow.md) | The model's API calls, decision loop, evidence checks, report output, and course criteria |
-| [Architecture](architecture.md) | How the main parts of the code fit together |
-| [Agent Loop](agent-loop.md) | How the model's turns, tool requests, retries, and turn limit work |
-| [Tools](tools.md) | The facts each analysis tool can provide |
-| [Data Flow](data-flow.md) | How game data moves through the program and becomes a report |
-| [Design Decisions](design-decisions.md) | Why the agent works this way and which choices belong to code or the model |
+| [Agentic Workflow](agentic-workflow.md) | Project parts, available facts tools, the model's decision loop, evidence checks, report output, and course criteria |

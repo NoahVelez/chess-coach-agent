@@ -58,6 +58,67 @@ sequenceDiagram
 
 The tools return measurements and game details, not coaching verdicts. For example, Stockfish can report that a move changed the evaluation; the model decides whether that evidence supports a useful lesson. Engine results are cached during a run, so a repeated request for the same analysis can reuse the earlier result.
 
+## How the project is organized
+
+The program is split into parts with clear jobs. This overview connects the workflow to the main folders and files:
+
+```mermaid
+flowchart LR
+    U["Player"] --> M["main.py<br/>starts a run and saves its output"]
+    M --> C["tools/chess_com.py<br/>loads and reads games"]
+    C --> M
+    M --> L["agent/loop.py<br/>talks to the AI model"]
+    L <-->|"questions and facts"| F["agent/facts_store.py<br/>checks and routes requests"]
+    F --> O["Opening and style tools<br/>count and measure"]
+    F -.->|"when requested"| S["tools/stockfish_tool.py<br/>asks Stockfish to evaluate"]
+    L <-->|"API conversation"| A["OpenAI API"]
+    L --> M
+    M --> R["reports/ and logs/"]
+```
+
+| Part | Responsibility |
+|---|---|
+| `main.py` | Starts the run, connects the parts, and saves the report and conversation. |
+| `agent/loop.py` | Calls the OpenAI API and runs the model's bounded question-and-answer loop. |
+| `agent/facts_store.py` | Keeps the game's facts available and checks and routes the model's tool requests. |
+| `tools/chess_com.py` | Gets recent public games and reads their moves and details. |
+| Opening and style tools | Count and measure game patterns; they do not choose coaching recommendations. |
+| `tools/stockfish_tool.py` | Gets engine evaluations when requested by the agent. |
+
+In short, Python and its tools establish **what happened**, while the model judges **what it means and what to recommend**. Stockfish contributes chess evaluations, not coaching advice.
+
+## What information can the agent request?
+
+All nine tools return facts, not ratings of a player's skill or coaching advice. Most summarize the games already loaded; two ask Stockfish for an evaluation when the model needs engine evidence.
+
+```mermaid
+flowchart LR
+    G["Recent game facts"] --> F["Player record, game list, and move details"]
+    G --> O["Opening choices, next moves, and line departures"]
+    G --> S["Style measurements"]
+    P["Agent requests engine evidence"] --> E["Stockfish analyzes a game or position"]
+    F --> A["Facts returned to the agent"]
+    O --> A
+    S --> A
+    E --> A
+```
+
+| Tool | What it can tell the agent |
+|---|---|
+| `get_player_profile` | How many games were loaded, results by color, and basic game and engine-analysis counts. |
+| `list_games` | Game details such as color, result, opening, and moves played. |
+| `get_game_moves` | The moves in one game, who played them, and clocks; engine details if that game was analyzed. |
+| `opening_sequences` | Which opening move sequences appear in the selected games and their results. |
+| `move_distribution` | What moves followed a chosen opening line and how often each occurred. |
+| `departure_points` | Where games first left a chosen line, which side left it, and what happened in those games. |
+| `get_style_measurements` | Raw counts such as castling, captures, and early queen moves; evaluation averages are included for games already analyzed. |
+| `analyze_game` | Stockfish findings for a whole game, including candidate mistakes and the engine's suggested moves. |
+| `evaluate_position` | A position's engine evaluation and best move after a supplied move sequence or part of a game. |
+
+Stockfish uses depth 14. By default, `analyze_game` flags moves where the evaluation dropped by at least 100 centipawns; `--threshold` changes that cutoff for a run. The flag means “worth checking,” not “definitely a mistake.” The two engine tools run only when requested, and repeated analysis can use cached results.
+
+Tool results are kept to a manageable size. When a result is shortened, it says so; groups too small to meet a requested minimum are not silently treated as strong evidence. Opening lines are compared by move order, so different move orders that reach the same chess position may remain separate. If a request is invalid or the engine cannot answer, the program sends an error back to the agent rather than presenting it as a chess fact.
+
 ## Decisions, checks, and limits
 
 The agent must make its reasoning path visible on tool turns: it states the question it is pursuing, why it chose that question, what could change its mind, and its current conclusion. The program checks that these fields and the requested tool arguments have the expected format. It does not decide whether the reasoning itself is good.
@@ -96,4 +157,4 @@ For the five-minute class presentation, a simple path is: explain the player's p
 
 The key agentic decision is not simply which tool to call: it is what coaching lesson and next action best fit the evidence for this player. To verify the program's deterministic behavior without external services, run the offline tests described in [Setup and Usage](setup-and-usage.md).
 
-For implementation details, see [Agent Loop](agent-loop.md), [Tools](tools.md), and [Data Flow](data-flow.md).
+For installation and run instructions, see [Setup and Usage](setup-and-usage.md).

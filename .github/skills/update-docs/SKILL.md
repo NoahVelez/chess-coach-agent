@@ -28,12 +28,8 @@ Create/refresh these files in `docs/` (adjust only if the code clearly warrants 
 
 | File | Purpose | Required diagrams |
 |------|---------|-------------------|
-| `docs/architecture.md` | Modules, responsibilities, and boundaries (agent vs. tools vs. CLI) | Component/flowchart of modules; `classDiagram` of key classes/functions; the "facts vs. judgment" boundary |
-| `docs/agent-loop.md` | How the agent loop works: history, iteration cap, parsing tool calls vs. `FINAL:` | `stateDiagram-v2` of loop states; `flowchart` of one iteration; `sequenceDiagram` of a typical multi-step run; early-exit/error paths |
-| `docs/tools.md` | Reference for each tool: inputs, outputs, facts-only guarantee, thresholds | Per-tool flowchart; `erDiagram` or `classDiagram` of returned data shapes |
-| `docs/data-flow.md` | End-to-end path from CLI input to coaching report | End-to-end `sequenceDiagram` (user → CLI → agent → LLM → tools → Chess.com/Stockfish → report); `flowchart` of how facts are stored and re-used |
-| `docs/setup-and-usage.md` | Landing page and setup: project overview, doc map, Stockfish setup, `.env`, run commands, troubleshooting | Setup flowchart; project guide map |
-| `docs/design-decisions.md` | Why it's a hand-rolled agent, what's deterministic vs. model-judged, constraints from the course guide | Flowchart contrasting rule-based vs. model-judged decisions; diagram of how the path varies per run |
+| `docs/agentic-workflow.md` | Readable overview of project parts, tools, agent decisions, checks, output, and course criteria | End-to-end flowchart; API/tool sequence; project-parts flowchart; tool map |
+| `docs/setup-and-usage.md` | Landing page and setup: project overview, doc links, Stockfish setup, `.env`, run commands, troubleshooting | Setup flowchart; links to the other guides |
 
 If the code contains subsystems not covered above (e.g., the facts store), cover them in the most relevant doc or add a new file and link it from `docs/setup-and-usage.md`.
 
